@@ -153,6 +153,5 @@ export interface IYandexDiskResource extends IDataObject {
  */
 export interface IYandexDiskTriggerOptions extends IDataObject {
 	fileType?: FileType;
-	returnAll?: boolean;
 	limit?: number;
 }

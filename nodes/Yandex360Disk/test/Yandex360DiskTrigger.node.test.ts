@@ -193,7 +193,7 @@ describe('Yandex360DiskTrigger', () => {
 			expect(result).toHaveLength(1);
 			expect(result![0].length).toBeGreaterThan(0);
 			expect(mockApi.recent).toHaveBeenCalledTimes(1);
-			expect(mockApi.recent).toHaveBeenCalledWith({ limit: 1000 });
+			expect(mockApi.recent).toHaveBeenCalledWith({ limit: 50 }); // Default limit
 		});
 
 		it('should return null when no changes found', async () => {
@@ -236,8 +236,6 @@ describe('Yandex360DiskTrigger', () => {
 
 			expect(mockStaticData).toHaveProperty('lastTimeChecked');
 			expect(typeof mockStaticData.lastTimeChecked).toBe('string');
-			expect(mockStaticData).toHaveProperty('lastProcessedResourceId');
-			expect(mockStaticData.lastProcessedResourceId).toBe('resource-1');
 		});
 
 		it('should update lastTimeChecked even when no items found', async () => {
@@ -367,8 +365,8 @@ describe('Yandex360DiskTrigger', () => {
 					true,
 				);
 			}
-			// Verify API was called with media_type filter
-			expect(mockApi.recent).toHaveBeenCalledWith({ limit: 1000, media_type: 'image' });
+			// Verify API was called with media_type filter (and default limit)
+			expect(mockApi.recent).toHaveBeenCalledWith({ limit: 50, media_type: 'image' });
 		});
 
 		it('should apply limit when returnAll is false', async () => {

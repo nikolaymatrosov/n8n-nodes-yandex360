@@ -113,32 +113,6 @@ export function filterByPath(
 }
 
 /**
- * Filter out already processed items based on modification time and resource_id
- */
-export function filterAlreadyProcessed(
-	items: IYandexDiskResource[],
-	lastTimeChecked: string,
-	lastProcessedResourceId?: string,
-): IYandexDiskResource[] {
-	if (!lastProcessedResourceId) return items;
-
-	const lastTime = new Date(lastTimeChecked).getTime();
-
-	return items.filter((item) => {
-		const itemTime = new Date(item.modified).getTime();
-
-		// If item has same modification time as last check
-		if (itemTime === lastTime) {
-			// Only include if it's not the already-processed item
-			return item.resource_id !== lastProcessedResourceId;
-		}
-
-		// Include items modified after last check
-		return itemTime > lastTime;
-	});
-}
-
-/**
  * Upload binary data to Yandex Disk
  * Handles the 2-step process: get upload URL → upload binary data
  */

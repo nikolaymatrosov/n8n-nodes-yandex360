@@ -14,7 +14,6 @@ import {
 	filterByModifiedTime,
 	applyLimit,
 	filterByPath,
-	filterAlreadyProcessed,
 } from './GenericFunctions';
 import { EVENTS, FILE_TYPES, FILE_TYPE_TO_MEDIA_TYPE, LOCATIONS, PARAMS } from './types';
 import type { IYandexDiskResource, IYandexDiskTriggerOptions } from './types';
@@ -142,27 +141,26 @@ export class Yandex360DiskTrigger implements INodeType {
 						description: 'Filter by file type',
 					},
 					{
-						displayName: 'Return All',
-						name: PARAMS.RETURN_ALL,
-						type: 'boolean',
-						default: false,
-						description: 'Whether to return all results or only up to a given limit',
-					},
-					{
 						displayName: 'Limit',
 						name: PARAMS.LIMIT,
 						type: 'number',
 						default: 50,
-						displayOptions: {
-							show: {
-								[PARAMS.RETURN_ALL]: [false],
-							},
-						},
 						typeOptions: {
 							minValue: 1,
 							maxValue: 1000,
 						},
-						description: 'Max number of results to return',
+						description: 'Max number of recent items to fetch per poll. API maximum: 1000.',
+					},
+					{
+						displayName: 'API Limitation Notice',
+						name: 'apiLimitationNotice',
+						type: 'notice',
+						default: '',
+						displayOptions: {
+							show: {},
+						},
+						placeholder:
+							'Important: The Yandex Disk API limits results to a maximum of 1000 items per poll. If more than 1000 files change between polls, older changes beyond the first 1000 will not be detected. Consider reducing the polling interval for high-volume scenarios.',
 					},
 				],
 			},
@@ -184,12 +182,13 @@ export class Yandex360DiskTrigger implements INodeType {
 			const now = moment().utc().format();
 			const startDate = (webhookData.lastTimeChecked as string) || now;
 			const endDate = now;
-			const lastProcessedResourceId = webhookData.lastProcessedResourceId as string | undefined;
 
 			let items: IYandexDiskResource[] = [];
 
 			if (this.getMode() === 'manual') {
 				// Manual mode: Return 1 item quickly for testing
+				// IMPORTANT: Do NOT update state in manual mode to prevent test executions
+				// from interfering with automated polling
 				try {
 					const response = await api.recent({ limit: 1 });
 					const responseBody = response.body;
@@ -204,6 +203,9 @@ export class Yandex360DiskTrigger implements INodeType {
 							description: 'Upload some files to your Yandex Disk to test this trigger',
 						});
 					}
+
+					// Return immediately without updating state
+					return [this.helpers.returnJsonArray(items)];
 				} catch (error) {
 					if (error instanceof NodeApiError) {
 						throw error;
@@ -213,15 +215,20 @@ export class Yandex360DiskTrigger implements INodeType {
 						description: 'Check your OAuth credentials and try again',
 					});
 				}
-			} else {
-				// Automated mode: Fetch recent changes using api.recent()
-				try {
+			}
+
+			// Automated mode: Fetch recent changes using api.recent()
+			try {
 					// Get file type option and map to API media_type
 					const fileType = options.fileType || FILE_TYPES.ALL;
 					const mediaType = FILE_TYPE_TO_MEDIA_TYPE[fileType];
 
+					// Get user's limit and cap at API maximum of 1000
+					const userLimit = options.limit || 50;
+					const apiLimit = Math.min(userLimit, 1000);
+
 					// Fetch recent files with API-level filtering
-					const recentOptions: any = { limit: 1000 };
+					const recentOptions: any = { limit: apiLimit };
 					if (mediaType) {
 						recentOptions.media_type = mediaType;
 					}
@@ -236,9 +243,6 @@ export class Yandex360DiskTrigger implements INodeType {
 					// Filter by modification time
 					items = filterByModifiedTime(items, startDate, endDate);
 
-					// Filter out already processed items
-					items = filterAlreadyProcessed(items, startDate, lastProcessedResourceId);
-
 					// Filter by event type (created vs updated)
 					items = filterByEventType(items, event);
 
@@ -251,26 +255,17 @@ export class Yandex360DiskTrigger implements INodeType {
 					// Apply detailed file type filter (client-side MIME matching)
 					items = filterByFileType(items, fileType);
 
-					// Apply limit if not returning all
-					const returnAll = options.returnAll || false;
-					if (!returnAll) {
-						const limit = options.limit || 50;
-						items = applyLimit(items, limit);
-					}
-				} catch (error) {
-					throw new NodeApiError(this.getNode(), error as any, {
-						message: 'Failed to fetch recent files from Yandex Disk',
-						description: 'Check your OAuth credentials and configuration',
-					});
-				}
+					// Apply client-side limit (already fetched with apiLimit from API)
+					items = applyLimit(items, userLimit);
+			} catch (error) {
+				throw new NodeApiError(this.getNode(), error as any, {
+					message: 'Failed to fetch recent files from Yandex Disk',
+					description: 'Check your OAuth credentials and configuration',
+				});
 			}
 
 			// Update state before returning (critical!)
 			webhookData.lastTimeChecked = endDate;
-			if (items.length > 0 && items[0].resource_id) {
-				// Store resource_id of most recent item to prevent duplicate processing
-				webhookData.lastProcessedResourceId = items[0].resource_id;
-			}
 
 			// Return data or null
 			if (items.length > 0) {

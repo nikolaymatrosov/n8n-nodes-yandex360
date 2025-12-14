@@ -2,11 +2,11 @@
 
 ## Status
 
-Proposed
+Proposed (Updated based on Trigger Node learnings)
 
 ## Date
 
-2025-12-14
+2025-12-14 (Original) / 2025-12-14 (Updated after Trigger implementation)
 
 ## Context
 
@@ -14,26 +14,36 @@ We need to implement a Yandex360Disk node to enable n8n users to interact with Y
 
 ### Existing Infrastructure
 
-The following components are already available:
+The following components are already available from the Trigger node implementation:
 
-1. **OAuth2 Authentication**
+1. **✅ OAuth2 Authentication (Implemented)**
    - Credential type: `yandex360OAuth2Api`
-   - Location: `/credentials/Yandex360OAuth2Api.credentials.ts`
-   - Provides: Bearer token authentication
+   - Location: [/credentials/Yandex360OAuth2Api.credentials.ts](/Users/nikthespirit/Documents/experiment/n8n-nodes-yandex360/credentials/Yandex360OAuth2Api.credentials.ts)
+   - Implementation: Simplified token-based auth with `Authorization: Bearer <token>` header
+   - **Key Learning:** Uses manual token management - users obtain tokens externally
 
-2. **Yandex Disk SDK**
+2. **✅ Yandex Disk SDK (Configured)**
    - Package: `yd-sdk` (v1.2.2)
    - Full TypeScript support with typed API methods
-   - Initialization helper: `initializeYandexDiskApi()` in `GenericFunctions.ts`
+   - Initialization helper: `initializeYandexDiskApi()` in [GenericFunctions.ts](/Users/nikthespirit/Documents/experiment/n8n-nodes-yandex360/nodes/Yandex360Disk/GenericFunctions.ts)
+   - Returns `sdk({ token })` instance ready for API calls
 
-3. **Error Handling Utilities**
-   - Location: `/utils/errorHandling.ts`
-   - Functions: `createOperationError()`, `createApiError()`, `withErrorHandling()`, `validateRequiredFields()`
+3. **✅ Helper Functions (Partially Implemented)**
+   - Location: [nodes/Yandex360Disk/GenericFunctions.ts](/Users/nikthespirit/Documents/experiment/n8n-nodes-yandex360/nodes/Yandex360Disk/GenericFunctions.ts)
+   - **Already implemented:** `initializeYandexDiskApi()`, filtering functions
+   - **Need to add:** Binary upload/download helpers, async operation polling helpers
+   - **Key Learning:** Binary operations use 2-step process requiring helper encapsulation
 
-4. **Type Patterns**
-   - Constants defined using `as const` pattern
+4. **✅ Type Patterns (Established)**
+   - Constants defined using `as const` pattern in [types.ts](/Users/nikthespirit/Documents/experiment/n8n-nodes-yandex360/nodes/Yandex360Disk/types.ts)
    - Type-safe parameter names via PARAMS constants
-   - Location: `nodes/Yandex360Disk/types.ts`
+   - Resource and operation constants already defined (RESOURCES, FILE_OPERATIONS, FOLDER_OPERATIONS)
+   - **Key Learning:** Use constants for values, literals for defaults (linter requirement)
+
+5. **⚠️ Error Handling Strategy (Revised)**
+   - Centralized utilities exist in `/utils/errorHandling.ts`
+   - **Key Learning from Trigger:** Direct use of `NodeApiError` with descriptive messages is simpler
+   - **Recommendation:** Use `NodeApiError` directly for Disk node consistency
 
 ### Yandex Disk API Characteristics
 
@@ -122,13 +132,21 @@ nodes/Yandex360Disk/
 - Simplifies error handling
 - Maintains consistency with n8n patterns
 
-**Functions to add**:
+**Functions to implement** (already outlined in GenericFunctions.ts):
 
-- `uploadBinaryData()` - Handle complete upload flow
-- `downloadBinaryData()` - Handle complete download flow
-- `isOperationLink()` - Check if API returned async operation link
-- `getOperationId()` - Extract operation ID from link
-- `waitForOperation()` - Poll operation status until completion
+✅ Already outlined:
+
+- `uploadBinaryData()` - Handle complete upload flow (lines 119-142)
+- `downloadBinaryData()` - Handle complete download flow (lines 148-165)
+- `isOperationLink()` - Check if API returned async operation link (lines 170-172)
+- `getOperationId()` - Extract operation ID from link (lines 177-183)
+- `waitForOperation()` - Poll operation status until completion (lines 193-217)
+
+**Implementation Status:** Function signatures and basic logic already defined in GenericFunctions.ts. Need to:
+
+1. Add comprehensive unit tests for these helpers
+2. Validate error handling in real scenarios
+3. Test 2-step upload/download flow end-to-end
 
 #### 3.2 Async Operation Handling
 
@@ -238,7 +256,15 @@ export const FOLDER_OPERATIONS = {
 } as const;
 
 export const PARAMS = {
-  // Existing params...
+  // Trigger params (already implemented)
+  EVENT: 'event',
+  LOCATION: 'location',
+  PATH: 'path',
+  OPTIONS: 'options',
+  FILE_TYPE: 'fileType',
+  LIMIT: 'limit',
+
+  // Regular node params (ready to use)
   RESOURCE: 'resource',
   OPERATION: 'operation',
   SOURCE_PATH: 'sourcePath',
@@ -247,8 +273,35 @@ export const PARAMS = {
   OVERWRITE: 'overwrite',
   PERMANENTLY: 'permanently',
   WAIT_FOR_COMPLETION: 'waitForCompletion',
+  FIELDS: 'fields',
+  SORT: 'sort',
+  OFFSET: 'offset',
 } as const;
 ```
+
+**Usage Pattern (from Trigger node experience):**
+
+```typescript
+// In property definitions
+{
+  displayName: 'Resource',
+  name: PARAMS.RESOURCE,  // Use constant
+  type: 'options',
+  default: 'file',  // Use literal string (linter requirement)
+  options: [
+    {
+      name: 'File',
+      value: RESOURCES.FILE,  // Use constant for values
+    }
+  ]
+}
+
+// In execute method
+const resource = this.getNodeParameter(PARAMS.RESOURCE, i) as string;
+const operation = this.getNodeParameter(PARAMS.OPERATION, i) as string;
+```
+
+**Key Learning:** Use literals for `default` values (linter requirement), constants everywhere else for type safety.
 
 ### 4. Testing Strategy
 
@@ -309,11 +362,13 @@ export const PARAMS = {
 
 ## Implementation Plan
 
-### Phase 1: Type Definitions and Helpers (Est: 1-2 hours)
+### Phase 1: Validate and Test Helper Functions (Est: 1-2 hours)
 
-1. Update `types.ts` with new constants
-2. Add helper functions to `GenericFunctions.ts`
-3. Test helpers in isolation
+1. ✅ Type constants already defined in `types.ts` (RESOURCES, FILE_OPERATIONS, FOLDER_OPERATIONS, PARAMS)
+2. ✅ Helper function signatures already outlined in `GenericFunctions.ts`
+3. ❌ Add unit tests for binary upload/download helpers
+4. ❌ Add unit tests for async operation polling helpers
+5. ❌ Validate 2-step upload/download flow with mocked HTTP requests
 
 ### Phase 2: Main Node Implementation (Est: 4-6 hours)
 
@@ -349,21 +404,40 @@ export const PARAMS = {
 
 **Total estimated time**: 9-14 hours
 
+**Revised estimate based on Trigger learnings**: 7-10 hours
+
+- Saved ~2-3 hours due to existing infrastructure (types, helpers, auth)
+- Saved ~1 hour from error handling simplification learnings
+
 ## Files to Create/Modify
 
-### New Files
+### New Files to Create
 
-- `/nodes/Yandex360Disk/Yandex360Disk.node.ts` (main node implementation)
-- `/nodes/Yandex360Disk/test/Yandex360Disk.node.test.ts` (comprehensive tests)
+- ❌ `/nodes/Yandex360Disk/Yandex360Disk.node.ts` (main node implementation, ~400-600 lines)
+- ❌ `/nodes/Yandex360Disk/test/Yandex360Disk.node.test.ts` (comprehensive tests for regular node)
 
-### Modified Files
+### Existing Files to Modify
 
-- `/nodes/Yandex360Disk/types.ts` (add RESOURCES, OPERATIONS, PARAMS constants)
-- `/nodes/Yandex360Disk/GenericFunctions.ts` (add binary and async operation helpers)
-- `/package.json` (register new node in `n8n.nodes` array)
-- `/README.md` (document new node)
-- `/README.ru.md` (document new node in Russian)
-- `/CHANGELOG.md` (add entry for v0.1.0 or next version)
+- ✅ `/nodes/Yandex360Disk/types.ts` - **Constants already defined**, ready to use
+  - RESOURCES, FILE_OPERATIONS, FOLDER_OPERATIONS already present
+  - PARAMS already includes all needed parameter names
+  - IYandexDiskResource interface already defined
+
+- ⚠️ `/nodes/Yandex360Disk/GenericFunctions.ts` - **Helpers outlined, need testing**
+  - ✅ Binary upload/download helpers outlined (need tests)
+  - ✅ Async operation helpers outlined (need tests)
+  - ✅ Filtering helpers implemented and tested
+  - ❌ Add unit tests for binary and async operation helpers
+
+- ❌ `/package.json` - Register new node in `n8n.nodes` array
+  - Already has `yandex360DiskTrigger` registered
+  - Need to add `yandex360Disk` entry
+
+- ❌ `/README.md` - Document new node with usage examples
+- ❌ `/README.ru.md` - Document new node in Russian
+- ❌ `/CHANGELOG.md` - Add entry for next version
+
+**Key Insight:** Much groundwork already completed during Trigger implementation. Main work is node logic and comprehensive testing.
 
 ## Success Criteria
 
@@ -378,10 +452,46 @@ export const PARAMS = {
 9. ✅ Error handling works in both `continueOnFail` modes
 10. ✅ Documentation is complete and accurate
 
+## Learnings from Trigger Node Implementation
+
+These key learnings should inform the Disk node implementation:
+
+1. **Authentication Simplification**
+   - Manual token management works well for MVP
+   - Don't overcomplicate with full OAuth flow initially
+   - Users can manage token refresh externally
+
+2. **Error Handling Approach**
+   - Direct `NodeApiError` usage is clearer than abstracted utilities
+   - Include actionable descriptions in error messages
+   - Preserve error instances to avoid double-wrapping
+
+3. **API Response Validation**
+   - Always validate response body structure defensively
+   - Check for expected fields before accessing
+   - Handle both success and empty-result cases
+
+4. **Constants Usage Pattern**
+   - Use literals for `default` values (linter requirement)
+   - Use constants for option `value` fields (type safety)
+   - Use constants in `displayOptions` and `getNodeParameter` calls
+
+5. **Testing Strategy**
+   - Mock SDK at module level with `jest.mock()`
+   - No need for separate mock files
+   - Focus on happy path, error scenarios, and edge cases
+   - Aim for >85% coverage
+
+6. **State Management**
+   - Separate manual vs automated mode behavior when applicable
+   - Update state before returning results
+   - Document state update timing clearly in comments
+
 ## References
 
 - [Yandex Disk REST API Documentation](https://yandex.com/dev/disk/rest/)
 - [yd-sdk GitHub Repository](https://github.com/axtk/yd-sdk)
 - [n8n Node Development Documentation](https://docs.n8n.io/integrations/creating-nodes/)
-- Project CLAUDE.md (implementation patterns and guidelines)
-- Existing Yandex360DiskTrigger node (reference implementation)
+- Project [CLAUDE.md](/Users/nikthespirit/Documents/experiment/n8n-nodes-yandex360/CLAUDE.md) (implementation patterns and guidelines)
+- Existing [Yandex360DiskTrigger node](/Users/nikthespirit/Documents/experiment/n8n-nodes-yandex360/nodes/Yandex360Disk/Yandex360DiskTrigger.node.ts) (reference implementation)
+- [ADR-001: Trigger Node Implementation](/Users/nikthespirit/Documents/experiment/n8n-nodes-yandex360/adr/001-yandex360-disk-trigger-node.md) (lessons learned)

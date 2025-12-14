@@ -25,7 +25,7 @@ export class Yandex360OAuth2Api implements ICredentialType {
 		type: 'generic',
 		properties: {
 			headers: {
-				Authorization: '=Bearer {{$credentials.oauthToken}}',
+				Authorization: '=OAuth {{$credentials.oauthToken}}',
 			},
 		},
 	};
