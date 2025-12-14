@@ -42,6 +42,7 @@
       "dist/credentials/Yandex360OAuth2Api.credentials.js"
     ],
     "nodes": [
+      "dist/nodes/Yandex360Disk/Yandex360Disk.node.js",
       "dist/nodes/Yandex360Disk/Yandex360DiskTrigger.node.js"
     ]
   },
