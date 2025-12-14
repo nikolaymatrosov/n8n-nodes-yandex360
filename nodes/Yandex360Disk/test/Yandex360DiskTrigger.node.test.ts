@@ -96,43 +96,6 @@ describe('Yandex360DiskTrigger', () => {
 			});
 		});
 
-		it('should return 1 item in manual mode', async () => {
-			const mockItem = {
-				name: 'test-file.txt',
-				path: '/test-file.txt',
-				type: 'file',
-				created: new Date().toISOString(),
-				modified: new Date().toISOString(),
-			};
-
-			mockApi.recent.mockResolvedValue({
-				status: 200,
-				body: {
-					items: [mockItem],
-				},
-			});
-
-			const result = await node.poll.call(mockPollFunctions as IPollFunctions);
-
-			expect(result).toHaveLength(1);
-			expect(result![0]).toHaveLength(1);
-			expect(result![0][0].json).toMatchObject(mockItem);
-			expect(mockApi.recent).toHaveBeenCalledWith({ limit: 1 });
-		});
-
-		it('should throw error when no files found in manual mode', async () => {
-			mockApi.recent.mockResolvedValue({
-				status: 200,
-				body: {
-					items: [],
-				},
-			});
-
-			await expect(node.poll.call(mockPollFunctions as IPollFunctions)).rejects.toThrow(
-				NodeApiError,
-			);
-		});
-
 		it('should handle API errors gracefully in manual mode', async () => {
 			mockApi.recent.mockRejectedValue(new Error('API Error'));
 
@@ -165,7 +128,7 @@ describe('Yandex360DiskTrigger', () => {
 			const mockItems = [
 				{
 					name: 'file1.txt',
-					path: '/file1.txt',
+					path: 'disk:/file1.txt',
 					type: 'file',
 					created: olderTime,
 					modified: recentTime, // Modified recently - will pass filter
@@ -173,7 +136,7 @@ describe('Yandex360DiskTrigger', () => {
 				},
 				{
 					name: 'file2.pdf',
-					path: '/file2.pdf',
+					path: 'disk:/file2.pdf',
 					type: 'file',
 					created: olderTime,
 					modified: recentTime, // Modified recently - will pass filter
@@ -217,7 +180,7 @@ describe('Yandex360DiskTrigger', () => {
 			const mockItems = [
 				{
 					name: 'file.txt',
-					path: '/file.txt',
+					path: 'disk:/file.txt',
 					type: 'file',
 					created: olderTime,
 					modified: recentTime,
@@ -275,7 +238,7 @@ describe('Yandex360DiskTrigger', () => {
 			const mockItems = [
 				{
 					name: 'doc.txt',
-					path: '/Documents/doc.txt',
+					path: 'disk:/Documents/doc.txt',
 					type: 'file',
 					created: olderTime,
 					modified: recentTime,
@@ -283,7 +246,7 @@ describe('Yandex360DiskTrigger', () => {
 				},
 				{
 					name: 'other.txt',
-					path: '/Other/other.txt',
+					path: 'disk:/Other/other.txt',
 					type: 'file',
 					created: olderTime,
 					modified: recentTime,
@@ -305,7 +268,7 @@ describe('Yandex360DiskTrigger', () => {
 			if (result) {
 				const returnedItems = result[0].map((item) => item.json);
 				expect(returnedItems.length).toBe(1);
-				expect(returnedItems[0].path).toBe('/Documents/doc.txt');
+				expect(returnedItems[0].path).toBe('disk:/Documents/doc.txt');
 			}
 		});
 	});
@@ -319,7 +282,7 @@ describe('Yandex360DiskTrigger', () => {
 			const mockItems = [
 				{
 					name: 'image.jpg',
-					path: '/image.jpg',
+					path: 'disk:/image.jpg',
 					type: 'file',
 					mime_type: 'image/jpeg',
 					created: olderTime,
@@ -328,7 +291,7 @@ describe('Yandex360DiskTrigger', () => {
 				},
 				{
 					name: 'document.pdf',
-					path: '/document.pdf',
+					path: 'disk:/document.pdf',
 					type: 'file',
 					mime_type: 'application/pdf',
 					created: olderTime,
@@ -376,7 +339,7 @@ describe('Yandex360DiskTrigger', () => {
 
 			const mockItems = Array.from({ length: 100 }, (_, i) => ({
 				name: `file${i}.txt`,
-				path: `/file${i}.txt`,
+				path: `disk:/file${i}.txt`,
 				type: 'file',
 				created: olderTime,
 				modified: recentTime,

@@ -22,6 +22,9 @@ export function filterByEventType(
 	items: IYandexDiskResource[],
 	event: string,
 ): IYandexDiskResource[] {
+	if (event === 'all') {
+		return items;
+	}
 	if (event === 'created') {
 		return items.filter((item) => {
 			const created = new Date(item.created).getTime();
@@ -96,6 +99,7 @@ export function applyLimit(items: IYandexDiskResource[], limit: number): IYandex
 
 /**
  * Filter items by path (exact match or children of the path)
+ * Handles paths with or without 'disk:' prefix and leading '/'
  */
 export function filterByPath(
 	items: IYandexDiskResource[],
@@ -103,8 +107,27 @@ export function filterByPath(
 ): IYandexDiskResource[] {
 	if (!targetPath || targetPath === '/') return items;
 
-	// Normalize path (remove trailing slash)
-	const normalizedPath = targetPath.endsWith('/') ? targetPath.slice(0, -1) : targetPath;
+	// Normalize user input path to match API format (disk:/path/to/file)
+	let normalizedPath = targetPath.trim();
+
+	// Add 'disk:' prefix if missing
+	if (!normalizedPath.startsWith('disk:')) {
+		// Ensure path starts with '/'
+		if (!normalizedPath.startsWith('/')) {
+			normalizedPath = '/' + normalizedPath;
+		}
+		normalizedPath = 'disk:' + normalizedPath;
+	}
+
+	// Remove trailing slash (but keep 'disk:/' for root)
+	if (normalizedPath.endsWith('/') && normalizedPath !== 'disk:/') {
+		normalizedPath = normalizedPath.slice(0, -1);
+	}
+
+	// If normalized path is disk:/, return all items (root path)
+	if (normalizedPath === 'disk:/') {
+		return items;
+	}
 
 	return items.filter((item) => {
 		// Match exact path or items within the path

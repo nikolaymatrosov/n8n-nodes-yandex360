@@ -21,6 +21,7 @@ export const EVENTS = {
 	CREATED: 'created',
 	UPDATED: 'updated',
 	DELETED: 'deleted',
+	ALL: 'all',
 } as const;
 
 export type EventType = (typeof EVENTS)[keyof typeof EVENTS];
