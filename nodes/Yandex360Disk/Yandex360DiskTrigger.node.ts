@@ -13,8 +13,10 @@ import {
 	filterByFileType,
 	filterByModifiedTime,
 	applyLimit,
+	filterByPath,
+	filterAlreadyProcessed,
 } from './GenericFunctions';
-import { EVENTS, FILE_TYPES, LOCATIONS, PARAMS } from './types';
+import { EVENTS, FILE_TYPES, FILE_TYPE_TO_MEDIA_TYPE, LOCATIONS, PARAMS } from './types';
 import type { IYandexDiskResource, IYandexDiskTriggerOptions } from './types';
 
 export class Yandex360DiskTrigger implements INodeType {
@@ -182,6 +184,7 @@ export class Yandex360DiskTrigger implements INodeType {
 			const now = moment().utc().format();
 			const startDate = (webhookData.lastTimeChecked as string) || now;
 			const endDate = now;
+			const lastProcessedResourceId = webhookData.lastProcessedResourceId as string | undefined;
 
 			let items: IYandexDiskResource[] = [];
 
@@ -197,7 +200,7 @@ export class Yandex360DiskTrigger implements INodeType {
 
 					if (items.length === 0) {
 						throw new NodeApiError(this.getNode(), response as any, {
-							message: 'No files found in Yandex Disk',
+							message: 'No recent files found in Yandex Disk',
 							description: 'Upload some files to your Yandex Disk to test this trigger',
 						});
 					}
@@ -211,47 +214,41 @@ export class Yandex360DiskTrigger implements INodeType {
 					});
 				}
 			} else {
-				// Automated mode: Fetch all changes since last check
+				// Automated mode: Fetch recent changes using api.recent()
 				try {
-					if (location === LOCATIONS.SPECIFIC_PATH) {
-						// Monitor specific path using api.info()
-						const path = this.getNodeParameter(PARAMS.PATH, 0) as string;
-						const response = await api.info({
-							path,
-							limit: 1000,
-							fields: 'name,path,type,mime_type,media_type,created,modified,size,md5,sha256,_embedded.items',
-						});
+					// Get file type option and map to API media_type
+					const fileType = options.fileType || FILE_TYPES.ALL;
+					const mediaType = FILE_TYPE_TO_MEDIA_TYPE[fileType];
 
-						const responseBody = response.body;
+					// Fetch recent files with API-level filtering
+					const recentOptions: any = { limit: 1000 };
+					if (mediaType) {
+						recentOptions.media_type = mediaType;
+					}
 
-						if (responseBody && typeof responseBody === 'object' && '_embedded' in responseBody) {
-							const embedded = responseBody._embedded as any;
-							if (embedded && 'items' in embedded) {
-								items = (embedded.items as IYandexDiskResource[]) || [];
-							}
-						}
-					} else {
-						// Monitor entire disk using api.list()
-						const response = await api.list({
-							limit: 1000,
-							fields: 'items.name,items.path,items.type,items.mime_type,items.media_type,items.created,items.modified,items.size,items.md5,items.sha256',
-						});
+					const response = await api.recent(recentOptions);
+					const responseBody = response.body;
 
-						const responseBody = response.body;
-
-						if (responseBody && typeof responseBody === 'object' && 'items' in responseBody) {
-							items = (responseBody.items as IYandexDiskResource[]) || [];
-						}
+					if (responseBody && typeof responseBody === 'object' && 'items' in responseBody) {
+						items = (responseBody.items as IYandexDiskResource[]) || [];
 					}
 
 					// Filter by modification time
 					items = filterByModifiedTime(items, startDate, endDate);
 
+					// Filter out already processed items
+					items = filterAlreadyProcessed(items, startDate, lastProcessedResourceId);
+
 					// Filter by event type (created vs updated)
 					items = filterByEventType(items, event);
 
-					// Apply file type filter if specified
-					const fileType = options.fileType || FILE_TYPES.ALL;
+					// Filter by path if specific path monitoring enabled
+					if (location === LOCATIONS.SPECIFIC_PATH) {
+						const path = this.getNodeParameter(PARAMS.PATH, 0) as string;
+						items = filterByPath(items, path);
+					}
+
+					// Apply detailed file type filter (client-side MIME matching)
 					items = filterByFileType(items, fileType);
 
 					// Apply limit if not returning all
@@ -262,14 +259,18 @@ export class Yandex360DiskTrigger implements INodeType {
 					}
 				} catch (error) {
 					throw new NodeApiError(this.getNode(), error as any, {
-						message: 'Failed to fetch files from Yandex Disk',
-						description: 'Check your OAuth credentials and path configuration',
+						message: 'Failed to fetch recent files from Yandex Disk',
+						description: 'Check your OAuth credentials and configuration',
 					});
 				}
 			}
 
 			// Update state before returning (critical!)
 			webhookData.lastTimeChecked = endDate;
+			if (items.length > 0 && items[0].resource_id) {
+				// Store resource_id of most recent item to prevent duplicate processing
+				webhookData.lastProcessedResourceId = items[0].resource_id;
+			}
 
 			// Return data or null
 			if (items.length > 0) {

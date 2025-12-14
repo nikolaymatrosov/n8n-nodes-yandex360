@@ -23,8 +23,6 @@ describe('Yandex360DiskTrigger', () => {
 
 		mockApi = {
 			recent: jest.fn(),
-			list: jest.fn(),
-			info: jest.fn(),
 		};
 
 		(sdk as jest.Mock).mockReturnValue(mockApi);
@@ -34,7 +32,7 @@ describe('Yandex360DiskTrigger', () => {
 		mockPollFunctions = {
 			getNodeParameter: jest.fn(),
 			getCredentials: jest.fn().mockResolvedValue({
-				oauthTokenData: { access_token: 'test-token' },
+				oauthToken: 'test-token',
 			} as ICredentialDataDecryptedObject),
 			getWorkflowStaticData: jest.fn().mockReturnValue(mockStaticData),
 			getMode: jest.fn().mockReturnValue('trigger'),
@@ -171,6 +169,7 @@ describe('Yandex360DiskTrigger', () => {
 					type: 'file',
 					created: olderTime,
 					modified: recentTime, // Modified recently - will pass filter
+					resource_id: 'resource-1',
 				},
 				{
 					name: 'file2.pdf',
@@ -178,10 +177,11 @@ describe('Yandex360DiskTrigger', () => {
 					type: 'file',
 					created: olderTime,
 					modified: recentTime, // Modified recently - will pass filter
+					resource_id: 'resource-2',
 				},
 			];
 
-			mockApi.list.mockResolvedValue({
+			mockApi.recent.mockResolvedValue({
 				status: 200,
 				body: {
 					items: mockItems,
@@ -192,11 +192,12 @@ describe('Yandex360DiskTrigger', () => {
 
 			expect(result).toHaveLength(1);
 			expect(result![0].length).toBeGreaterThan(0);
-			expect(mockApi.list).toHaveBeenCalledTimes(1);
+			expect(mockApi.recent).toHaveBeenCalledTimes(1);
+			expect(mockApi.recent).toHaveBeenCalledWith({ limit: 1000 });
 		});
 
 		it('should return null when no changes found', async () => {
-			mockApi.list.mockResolvedValue({
+			mockApi.recent.mockResolvedValue({
 				status: 200,
 				body: {
 					items: [],
@@ -211,6 +212,7 @@ describe('Yandex360DiskTrigger', () => {
 		it('should update lastTimeChecked state', async () => {
 			const recentTime = new Date(Date.now() - 1000).toISOString();
 			const olderTime = new Date(Date.now() - 10000).toISOString();
+			mockStaticData.lastTimeChecked = new Date(Date.now() - 10000).toISOString();
 
 			const mockItems = [
 				{
@@ -219,10 +221,11 @@ describe('Yandex360DiskTrigger', () => {
 					type: 'file',
 					created: olderTime,
 					modified: recentTime,
+					resource_id: 'resource-1',
 				},
 			];
 
-			mockApi.list.mockResolvedValue({
+			mockApi.recent.mockResolvedValue({
 				status: 200,
 				body: {
 					items: mockItems,
@@ -233,10 +236,12 @@ describe('Yandex360DiskTrigger', () => {
 
 			expect(mockStaticData).toHaveProperty('lastTimeChecked');
 			expect(typeof mockStaticData.lastTimeChecked).toBe('string');
+			expect(mockStaticData).toHaveProperty('lastProcessedResourceId');
+			expect(mockStaticData.lastProcessedResourceId).toBe('resource-1');
 		});
 
 		it('should update lastTimeChecked even when no items found', async () => {
-			mockApi.list.mockResolvedValue({
+			mockApi.recent.mockResolvedValue({
 				status: 200,
 				body: {
 					items: [],
@@ -264,23 +269,46 @@ describe('Yandex360DiskTrigger', () => {
 			});
 		});
 
-		it('should use specified path in API call', async () => {
-			mockApi.info.mockResolvedValue({
+		it('should filter items by specified path', async () => {
+			const recentTime = new Date(Date.now() - 1000).toISOString();
+			const olderTime = new Date(Date.now() - 10000).toISOString();
+			mockStaticData.lastTimeChecked = new Date(Date.now() - 10000).toISOString();
+
+			const mockItems = [
+				{
+					name: 'doc.txt',
+					path: '/Documents/doc.txt',
+					type: 'file',
+					created: olderTime,
+					modified: recentTime,
+					resource_id: 'resource-1',
+				},
+				{
+					name: 'other.txt',
+					path: '/Other/other.txt',
+					type: 'file',
+					created: olderTime,
+					modified: recentTime,
+					resource_id: 'resource-2',
+				},
+			];
+
+			mockApi.recent.mockResolvedValue({
 				status: 200,
 				body: {
-					_embedded: {
-						items: [],
-					},
+					items: mockItems,
 				},
 			});
 
-			await node.poll.call(mockPollFunctions as IPollFunctions);
+			const result = await node.poll.call(mockPollFunctions as IPollFunctions);
 
-			expect(mockApi.info).toHaveBeenCalledWith(
-				expect.objectContaining({
-					path: '/Documents',
-				}),
-			);
+			// Should only return files from /Documents
+			expect(result).not.toBeNull();
+			if (result) {
+				const returnedItems = result[0].map((item) => item.json);
+				expect(returnedItems.length).toBe(1);
+				expect(returnedItems[0].path).toBe('/Documents/doc.txt');
+			}
 		});
 	});
 
@@ -298,6 +326,7 @@ describe('Yandex360DiskTrigger', () => {
 					mime_type: 'image/jpeg',
 					created: olderTime,
 					modified: recentTime,
+					resource_id: 'resource-1',
 				},
 				{
 					name: 'document.pdf',
@@ -306,6 +335,7 @@ describe('Yandex360DiskTrigger', () => {
 					mime_type: 'application/pdf',
 					created: olderTime,
 					modified: recentTime,
+					resource_id: 'resource-2',
 				},
 			];
 
@@ -320,7 +350,7 @@ describe('Yandex360DiskTrigger', () => {
 				return params[paramName];
 			});
 
-			mockApi.list.mockResolvedValue({
+			mockApi.recent.mockResolvedValue({
 				status: 200,
 				body: {
 					items: mockItems,
@@ -337,6 +367,8 @@ describe('Yandex360DiskTrigger', () => {
 					true,
 				);
 			}
+			// Verify API was called with media_type filter
+			expect(mockApi.recent).toHaveBeenCalledWith({ limit: 1000, media_type: 'image' });
 		});
 
 		it('should apply limit when returnAll is false', async () => {
@@ -350,6 +382,7 @@ describe('Yandex360DiskTrigger', () => {
 				type: 'file',
 				created: olderTime,
 				modified: recentTime,
+				resource_id: `resource-${i}`,
 			}));
 
 			(mockPollFunctions.getNodeParameter as jest.Mock).mockImplementation((paramName: string) => {
@@ -364,7 +397,7 @@ describe('Yandex360DiskTrigger', () => {
 				return params[paramName];
 			});
 
-			mockApi.list.mockResolvedValue({
+			mockApi.recent.mockResolvedValue({
 				status: 200,
 				body: {
 					items: mockItems,
@@ -394,7 +427,7 @@ describe('Yandex360DiskTrigger', () => {
 		});
 
 		it('should throw NodeApiError on API failure', async () => {
-			mockApi.list.mockRejectedValue(new Error('Network error'));
+			mockApi.recent.mockRejectedValue(new Error('Network error'));
 
 			await expect(node.poll.call(mockPollFunctions as IPollFunctions)).rejects.toThrow(
 				NodeApiError,
@@ -403,7 +436,7 @@ describe('Yandex360DiskTrigger', () => {
 
 		it('should handle invalid credentials', async () => {
 			(mockPollFunctions.getCredentials as jest.Mock).mockResolvedValue({
-				oauthTokenData: {},
+				oauthToken: '',
 			});
 
 			await expect(node.poll.call(mockPollFunctions as IPollFunctions)).rejects.toThrow();

@@ -50,6 +50,18 @@ export const FILE_TYPES = {
 export type FileType = (typeof FILE_TYPES)[keyof typeof FILE_TYPES];
 
 /**
+ * Maps user-friendly file type options to Yandex Disk API media_type values
+ */
+export const FILE_TYPE_TO_MEDIA_TYPE: Record<string, string | undefined> = {
+	[FILE_TYPES.ALL]: undefined,
+	[FILE_TYPES.DOCUMENT]: 'document',
+	[FILE_TYPES.IMAGE]: 'image',
+	[FILE_TYPES.VIDEO]: 'video',
+	[FILE_TYPES.AUDIO]: 'audio',
+	[FILE_TYPES.ARCHIVE]: 'compressed',
+} as const;
+
+/**
  * Resource constants for Yandex360Disk node
  */
 export const RESOURCES = {
@@ -122,6 +134,7 @@ export type ParamName = (typeof PARAMS)[keyof typeof PARAMS];
  * Yandex Disk resource from API
  */
 export interface IYandexDiskResource extends IDataObject {
+	resource_id?: string;
 	name: string;
 	path: string;
 	type: 'dir' | 'file';

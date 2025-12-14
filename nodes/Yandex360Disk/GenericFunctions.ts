@@ -95,6 +95,50 @@ export function applyLimit(items: IYandexDiskResource[], limit: number): IYandex
 }
 
 /**
+ * Filter items by path (exact match or children of the path)
+ */
+export function filterByPath(
+	items: IYandexDiskResource[],
+	targetPath: string,
+): IYandexDiskResource[] {
+	if (!targetPath || targetPath === '/') return items;
+
+	// Normalize path (remove trailing slash)
+	const normalizedPath = targetPath.endsWith('/') ? targetPath.slice(0, -1) : targetPath;
+
+	return items.filter((item) => {
+		// Match exact path or items within the path
+		return item.path === normalizedPath || item.path.startsWith(normalizedPath + '/');
+	});
+}
+
+/**
+ * Filter out already processed items based on modification time and resource_id
+ */
+export function filterAlreadyProcessed(
+	items: IYandexDiskResource[],
+	lastTimeChecked: string,
+	lastProcessedResourceId?: string,
+): IYandexDiskResource[] {
+	if (!lastProcessedResourceId) return items;
+
+	const lastTime = new Date(lastTimeChecked).getTime();
+
+	return items.filter((item) => {
+		const itemTime = new Date(item.modified).getTime();
+
+		// If item has same modification time as last check
+		if (itemTime === lastTime) {
+			// Only include if it's not the already-processed item
+			return item.resource_id !== lastProcessedResourceId;
+		}
+
+		// Include items modified after last check
+		return itemTime > lastTime;
+	});
+}
+
+/**
  * Upload binary data to Yandex Disk
  * Handles the 2-step process: get upload URL → upload binary data
  */
