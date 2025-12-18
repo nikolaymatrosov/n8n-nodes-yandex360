@@ -38,8 +38,13 @@
   ],
   "n8n": {
     "n8nNodesApiVersion": 1,
-    "credentials": [],
-    "nodes": [""]
+    "credentials": [
+      "dist/credentials/Yandex360OAuth2Api.credentials.js"
+    ],
+    "nodes": [
+      "dist/nodes/Yandex360Disk/Yandex360Disk.node.js",
+      "dist/nodes/Yandex360Disk/Yandex360DiskTrigger.node.js"
+    ]
   },
   "devDependencies": {
     "@eslint/eslintrc": "^3.3.1",
@@ -64,6 +69,7 @@
   "dependencies": {
     "generate-schema": "^2.6.0",
     "lodash": "^4.17.21",
+    "moment-timezone": "^0.6.0",
     "yd-sdk": "^1.2.2"
   },
   "peerDependencies": {
