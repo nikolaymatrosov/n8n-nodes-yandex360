@@ -24,6 +24,7 @@ Integration package for working with Yandex 360 services in n8n.
 Interact with Yandex 360 Disk storage - upload, download, manage files and folders.
 
 **File Operations:**
+
 - **Upload**: Upload binary data from workflow to Yandex Disk
 - **Download**: Download files from Yandex Disk as binary data
 - **Delete**: Delete files (to trash or permanently)
@@ -34,6 +35,7 @@ Interact with Yandex 360 Disk storage - upload, download, manage files and folde
 - **Unpublish**: Remove public access from files
 
 **Folder Operations:**
+
 - **Create**: Create new folders
 - **List**: List folder contents with pagination and sorting
 - **Delete**: Delete folders (to trash or permanently)
@@ -42,6 +44,7 @@ Interact with Yandex 360 Disk storage - upload, download, manage files and folde
 - **Unpublish**: Remove public access from folders
 
 **Features:**
+
 - Binary data support for file operations
 - Async operation handling (copy, move, delete)
 - Configurable "wait for completion" for long-running operations
@@ -53,10 +56,12 @@ Interact with Yandex 360 Disk storage - upload, download, manage files and folde
 Monitor Yandex 360 Disk for file and folder changes.
 
 **Trigger Events:**
+
 - File or folder created
 - File or folder updated
 
 **Features:**
+
 - Monitor entire disk or specific path
 - Filter by file type (document, image, video, audio, archive)
 - Configurable polling limits
@@ -89,6 +94,7 @@ npm install @nikolaymatrosov/n8n-nodes-yandex360
 To use these nodes, you need a Yandex 360 OAuth token.
 
 **Setup:**
+
 1. Go to [Yandex OAuth](https://yandex.com/dev/id/doc/en/)
 2. Create an application and get your OAuth token
 3. In n8n, create new credentials of type "Yandex 360 OAuth2 API"
