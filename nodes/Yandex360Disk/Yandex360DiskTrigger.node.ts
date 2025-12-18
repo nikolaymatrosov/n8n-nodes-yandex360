@@ -242,10 +242,10 @@ export class Yandex360DiskTrigger implements INodeType {
 					description: 'Check your OAuth credentials and configuration',
 				});
 			}
-			if (isManual(this)) {
-				// Update state before returning (critical!)
-				webhookData.lastTimeChecked = endDate;
-			}
+
+			// Update state before returning (critical!)
+			// Always update lastTimeChecked, even if no items found
+			webhookData.lastTimeChecked = endDate;
 
 			// Return data or null
 			if (items.length > 0) {
