@@ -1,5 +1,5 @@
 
-![Banner](./assets/yc_n8n.svg)
+![Banner](./assets/yandex360_n8n.svg)
 
 # n8n-nodes-yandex360 Package Description
 
