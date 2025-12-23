@@ -1,7 +1,9 @@
-import type { IAuthenticateGeneric, ICredentialType, INodeProperties } from 'n8n-workflow';
+import type { IAuthenticateGeneric, Icon, ICredentialType, INodeProperties } from 'n8n-workflow';
 
 export class Yandex360OAuth2Api implements ICredentialType {
 	name = 'yandex360OAuth2Api';
+
+	icon = 'file:yandex360.svg' as Icon;
 
 	displayName = 'Yandex 360 OAuth2 API';
 
